@@ -1,4 +1,6 @@
 
+import java.util.Random;
+
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Application;
@@ -21,15 +23,16 @@ public class GUIMain extends Application{
 	private static final int drawScale = windowSize/100;
 	
 	private static Airport airport;
+	private static Random random;
 	
 	/**
 	 * launches the GUI
 	 */
 	public static void main(String[] args) {
+		random = new Random();
 		airport = new Airport();
-		airport.newPlane();
-		airport.newPlane();
-		airport.newPlane();
+		for(int i = 0; i < 3; i++)
+			airport.newPlane(random.nextInt(2));
 		launch();
 	}
 	
@@ -55,7 +58,7 @@ public class GUIMain extends Application{
 	 * runs mainloop every 20 miliseconds
 	 */
 	private void startAnimation() {
-		Timeline timeline = new Timeline(new KeyFrame(Duration.millis(20), new mainLoop()));
+		Timeline timeline = new Timeline(new KeyFrame(Duration.millis(3), new mainLoop()));
 		timeline.setCycleCount(Timeline.INDEFINITE);
 		timeline.play();
 	}
