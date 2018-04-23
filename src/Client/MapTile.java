@@ -1,3 +1,4 @@
+package Client;
 public enum MapTile{
 		GRASS(-1,-1), 
 		RUNWAY(-1,-1), RUNWAYEXITSOUTH(-1,-1),

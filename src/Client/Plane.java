@@ -1,8 +1,15 @@
+package Client;
 import java.awt.Point;
+import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.Queue;
 
-public class Plane {
+/**
+ * Logic behind a single plane
+ * @author Derian Davila Acuna
+ *
+ */
+public class Plane implements Serializable{
 	
 	private static final int alignTime = 500;
 	
@@ -37,6 +44,10 @@ public class Plane {
 		this.takeoffRunway = takeoffRunway;
 	}
 	
+	/**
+	 * updates the position of the plane based on the current velocity
+	 * depending on the stage the plane it is it may call requestLanding, checkLocation, and checkForPlane
+	 */
 	public void nextTick() {
 		ticksSinceLastStage++;
 		xCord += xVel;
@@ -62,6 +73,7 @@ public class Plane {
 			}
 		}
 		else if(curStage == planeStage.TAKEOFF) {
+			//makes sure the plane gets deleted by the airport after this
 			if((int)xCord == 99) {
 				airport.runway0InUse = false;
 				left = true;
@@ -71,6 +83,7 @@ public class Plane {
 				left = true;
 			}
 			else {
+				//start accelerating the plane up to 0.1 in a dir
 				if(ticksSinceLastStage > alignTime) {
 					if(takeoffRunway == 0) {
 						xVel = Math.min(0.1, xVel+0.003);
@@ -87,33 +100,39 @@ public class Plane {
 		else if(curStage == planeStage.TERMINAL) {
 			if(ticksSinceLastStage == 500) {
 				 terminal = map.getTile((int)xCord, (int)yCord).terminalNum;
-					System.out.println(planeNum + ": " + terminal);	
 			}
 			if(ticksSinceLastStage <= timeAtTerminal)
 				return;
-		
-			System.out.println("exiting term");
+			//make sure there is no plane in the intersection
+			if(airport.i1InUse)
+				return;
+			airport.i1InUse = true;
+			inIntersection = true;
 			curStage = planeStage.TAXING;
 			instruction.poll();
 			airport.leftTerminal(terminal);
 		}
-		else {
+		else {//if the plane is simply taxing
 			checkLocation();
 			checkForPlane();
 		}
 	}
 	
+	/**
+	 * Does various actions depending on the tile the plane is on and the square it is on/has passed
+	 * INTERSECTIONA1 - checks if another plane is in the intersection before driving on it
+	 * RUNWAYWAIT -  checks if the runway is being used before driving onto it
+	 * 
+	 */
 	private void checkLocation() {
 		MapTile curTile = null;
 		boolean match = false;
 		Instruction currentInt = null;
 		if(curStage != planeStage.AIR && curStage != planeStage.GOINGAROUND && instruction != null) {
-		//	System.out.println(xCord +" " + yCord);
 			curTile = map.getTile((int)xCord, (int)yCord);	
 			currentInt = instruction.peek();
 		}
-		if(curTile == MapTile.TAXIWAYWEST && inIntersection)
-			inIntersection = false;
+		//need to stop the plane at the intersection if another plane is on it
 		if(curTile == MapTile.INTERSECTIONA1) {
 			if(airport.i1InUse && !inIntersection) {
 				xVel = 0;
@@ -156,6 +175,7 @@ public class Plane {
 			xVel = 0;
 			yVel = 0;
 		}
+		//LOCATION CHECKS, if the plane has passed the intended location call reachedPoint else keep the velocity in its current direction at 0.05
 		else if(xCord != currentInt.xCord) {
 			if(currentInt.dir == Direction.WEST && xCord < currentInt.xCord)
 				reachedPoint(curTile);
@@ -183,6 +203,11 @@ public class Plane {
 			yVel = 0;
 		}
 	}
+	
+	/**
+	 * checks for a plane 3 squares in front of it
+	 * if there is a plane in that direciton then this stops this plane
+	 */
 	public void checkForPlane() {
 		if(curDir == null)
 			return;
@@ -216,13 +241,18 @@ public class Plane {
 		}
 	}
 	
+	/**
+	 * request to land at the airport
+	 * if there is no terminal or no availbe runway then the plane waits for x ticks before calling this again
+	 * also fetches the instructions once it has been given a runway to land to
+	 */
 	private void requestLanding() {
 		if(!airport.availableTerminal()) {
 			curStage = planeStage.GOINGAROUND;
 			ticksSinceLastStage = 0;
 			return;
 		}
-		Point entry = airport.requestRunway(planeNum);
+		Point entry = airport.requestRunway();
 		if(entry == null) {
 			curStage = planeStage.GOINGAROUND;
 			ticksSinceLastStage = 0;
@@ -243,7 +273,6 @@ public class Plane {
 				yVel = -0.2;
 			curStage = planeStage.LANDING;
 			instruction = new LinkedList<Instruction>(airport.getTerminal(landRunway));
-			System.out.println("request instructions");
 			if(instruction == null)
 				return;
 			if(planeNum == 1);
@@ -251,13 +280,16 @@ public class Plane {
 		ticksSinceLastStage = 0;
 	}
 	
+	/** 
+	 * if the plane has reached or passed the point in the instruction the plane is forced to the point in the instruction
+	 * sets up curStage and curDir with the next instructions stage and direction
+	 * @param curTile - the tile the plane is on
+	 */
 	private void reachedPoint(MapTile curTile) {
 		xCord = instruction.peek().xCord;
 		yCord = instruction.peek().yCord;
 		xVel = 0;
 		yVel = 0;
-		if(planeNum == 1 && instruction.peek().getInstruction)
-			System.out.println("wow");
 		if(instruction.peek().getInstruction)
 			instruction = new LinkedList<Instruction>(map.runwayDirections(takeoffRunway, curTile.intersectionNum));
 		else
