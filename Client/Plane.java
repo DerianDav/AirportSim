@@ -1,4 +1,4 @@
-package Client;
+
 import java.awt.Point;
 import java.io.Serializable;
 import java.util.LinkedList;
@@ -16,24 +16,30 @@ public class Plane implements Serializable{
 	int planeNum;
 	private double xCord;
 	private double yCord;
-	private double xVel;
-	private double yVel;
-	private boolean flying;
-	private Airport airport;
-	private Direction curDir;
-	private static Map map;
-	private planeStage curStage;
-	private int ticksSinceLastStage;
-	private Queue<Instruction> instruction;
-	private boolean inIntersection = false;
-	private boolean onRunway = false;
-	private boolean left = false;
-	private int terminal = -1;
-	private int timeAtTerminal = 2000;
-	private int landRunway;
-	private int takeoffRunway;
+	public double xVel;
+	public double yVel;
+	public boolean flying;
+	public Airport airport;
+	public Direction curDir;
+	public static Map map;
+	public planeStage curStage;
+	public int ticksSinceLastStage;
+	public Queue<Instruction> instruction;
+	public boolean inIntersection = false;
+	public boolean onRunway = false;
+	public boolean left = false;
+	public int terminal = -1;
+	public int timeAtTerminal = 2000;
+	public int landRunway;
+	public int takeoffRunway;
+	public boolean foreign;
 	
-	public Plane(Airport airport, Map map, int planeNum, int takeoffRunway) {
+	//RGB stored as ints since javaFX isn't serializable
+	public int rColor;
+	public int gColor;
+	public int bColor;
+	
+	public Plane(Airport airport, Map map, int planeNum, int takeoffRunway, int rColor, int gColor, int bColor) {
 		this.airport = airport; 
 		this.map = map;
 		curStage = planeStage.AIR;
@@ -42,6 +48,37 @@ public class Plane implements Serializable{
 		yVel = 0;
 		this.planeNum = planeNum;
 		this.takeoffRunway = takeoffRunway;
+		foreign = false;
+		this.rColor = rColor;
+		this.gColor = gColor;
+		this.bColor = bColor;
+	}
+	
+	public Plane(Airport airport, PlaneShell plane, Map map) {
+		planeNum = plane.planeNum;
+		xCord = plane.xCord;
+		yCord = plane.yCord;
+		xVel = plane.xVel;
+		yVel = plane.yVel;
+		flying = plane.flying;
+		curDir = plane.curDir;
+		curStage = plane.curStage;
+		ticksSinceLastStage = plane.ticksSinceLastStage;
+		instruction = plane.instruction;
+		inIntersection = plane.inIntersection;
+		onRunway = plane.onRunway;
+		left = plane.left;
+		terminal = plane.terminal;
+		timeAtTerminal = plane.timeAtTerminal;
+		landRunway = plane.landRunway;
+		takeoffRunway = plane.takeoffRunway;
+		foreign = plane.foreign;
+		rColor = plane.rColor;
+		bColor = plane.bColor;
+		gColor = plane.gColor;
+		this.airport = airport;
+		this.map = map;
+		
 	}
 	
 	/**
@@ -125,13 +162,15 @@ public class Plane implements Serializable{
 	 * 
 	 */
 	private void checkLocation() {
-		MapTile curTile = null;
+		MapTile curTile = null; 
 		boolean match = false;
 		Instruction currentInt = null;
 		if(curStage != planeStage.AIR && curStage != planeStage.GOINGAROUND && instruction != null) {
 			curTile = map.getTile((int)xCord, (int)yCord);	
 			currentInt = instruction.peek();
 		}
+		else if((curStage != planeStage.AIR || curStage != planeStage.GOINGAROUND) && instruction == null)
+			return;
 		//need to stop the plane at the intersection if another plane is on it
 		if(curTile == MapTile.INTERSECTIONA1) {
 			if(airport.i1InUse && !inIntersection) {
@@ -247,6 +286,8 @@ public class Plane implements Serializable{
 	 * also fetches the instructions once it has been given a runway to land to
 	 */
 	private void requestLanding() {
+		if(foreign)
+			return;
 		if(!airport.availableTerminal()) {
 			curStage = planeStage.GOINGAROUND;
 			ticksSinceLastStage = 0;
@@ -276,6 +317,8 @@ public class Plane implements Serializable{
 			if(instruction == null)
 				return;
 			if(planeNum == 1);
+			if(airport.isOnline())
+				airport.sendUpdatedInstructions(this);
 		}
 		ticksSinceLastStage = 0;
 	}
@@ -290,13 +333,18 @@ public class Plane implements Serializable{
 		yCord = instruction.peek().yCord;
 		xVel = 0;
 		yVel = 0;
-		if(instruction.peek().getInstruction)
+		if(instruction.peek().getInstruction && !foreign) {
 			instruction = new LinkedList<Instruction>(map.runwayDirections(takeoffRunway, curTile.intersectionNum));
+			if(airport.isOnline())
+				airport.sendUpdatedInstructions(this);
+		}
 		else
 			instruction.poll();
 		planeStage lastStage = curStage;
 		if(curStage == planeStage.LANDING)
 			airport.leftRunway(landRunway);
+		if(instruction.peek() == null)
+			return;
 		curStage = instruction.peek().stage;
 		curDir = instruction.peek().dir;
 		if(lastStage != curStage)
@@ -318,4 +366,5 @@ public class Plane implements Serializable{
 	public double getY() {return yCord;}
 	public boolean hasLeft() {return left;}
 	public int getTerminal() {return terminal;}
+	public PlaneShell getShell() {return new PlaneShell(this);}
 }

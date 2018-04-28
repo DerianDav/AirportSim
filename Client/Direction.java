@@ -1,6 +1,8 @@
-package Client;
 
-public enum Direction {
+
+import java.io.Serializable;
+
+public enum Direction implements Serializable{
 	WEST(-1,0),EAST(1,0),NORTH(0,-1),SOUTH(0,1);
 	
 	int x, y;

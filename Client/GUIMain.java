@@ -1,5 +1,5 @@
-package Client;
 
+//TODO: REMOVE PACKAGE NAME WHEN SUBMITING
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -48,12 +48,12 @@ public class GUIMain extends Application{
 	private static final int windowSize = 700;
 	private static final int drawScale = windowSize/100;
 	private static final int topBar = 0;
-	private static final int milisecPerTick = 5;
+	private static final int milisecPerTick = 3;
+	
+	private static boolean online;
 	
 	private static Airport airport;
 	private static Random random;
-	
-	private static int globalTime;//seconds
 	private static Label timeLabel;
 	private static Label nextPlaneTime;
 	private StackPane pane;
@@ -66,9 +66,17 @@ public class GUIMain extends Application{
 	 */
 	public static void main(String[] args) {
 		random = new Random();
-		airport = new Airport();
-	//	for(int i = 0; i < 20; i++)
-	//		airport.newPlane(random.nextInt(2));
+		if(Integer.parseInt(args[0]) == 0)
+				online = true;
+		else
+			online = false;
+		//online = true;
+		String serverAddr = "localhost";
+		if(online == true) {
+			if(args.length == 2)
+				serverAddr = args[1];
+		}
+		airport = new Airport(online, serverAddr);
 		launch();
 	}
 	
@@ -81,7 +89,6 @@ public class GUIMain extends Application{
 		pane.getChildren().add(canvas);
 		timeLabel = new Label("TIME: 00:00:00");
 		timeLabel.setMinSize(100, 10);
-		globalTime = 0;
 		pane.setAlignment(timeLabel, Pos.TOP_RIGHT);
 		
 
@@ -161,27 +168,32 @@ public class GUIMain extends Application{
 			gc.fillRect(0, 0, windowSize, windowSize);
 			airport.nextTick();
 			airport.drawSimulation(gc, drawScale, topBar);
-			globalTime++;
-			int second = globalTime%60;
-			int minute = (globalTime/60)%60;
-			int hour = (globalTime/60/60)%60;
+			airport.globalTime++;
+			int second = airport.globalTime%60;
+			int minute = (airport.globalTime/60)%60;
+			int hour = (airport.globalTime/60/60)%60;
 			if(hour >= 24) {
-				globalTime -= 60*60*24;
+				airport.globalTime -= 60*60*24;
 				Collections.sort(planeList);
 			}
 			
 			timeLabel.setText("TIME: " + timeToString(hour,minute,second));
 			
 			if(planeList.size() > 0) {
-				while(planeList.size() > 0 && planeList.get(0).time == globalTime) {
+				while(planeList.size() > 0 && planeList.get(0).time == airport.globalTime) {
 					airport.newPlane(planeList.get(0).runway);
 					planeList.remove(0);
 				}
-			//	if(planeList.get(0).time < globalTime)
-			//		planeList.remove(0);
-				second = planeList.get(0).time%60;
-				minute = planeList.get(0).time/60%60;
-				hour = planeList.get(0).time/60/60%60;
+				if(planeList.size() > 0) {
+					second = planeList.get(0).time%60;
+					minute = planeList.get(0).time/60%60;
+					hour = planeList.get(0).time/60/60%60;
+				}
+				else {
+					second = 0;
+					minute = 0;
+					hour = 0;
+				}
 				nextPlaneTime.setText("Next Plane At: " + timeToString(hour,minute,second));
 			}
 			else {
@@ -190,7 +202,7 @@ public class GUIMain extends Application{
 		}
 	}
 
-	/**
+	/** 
 	 * stores info on the next plane to be created
 	 */
 	private class planeQ implements Comparable<planeQ>{
@@ -205,9 +217,9 @@ public class GUIMain extends Application{
 			int timeTemp, pTimeTemp;
 			timeTemp = time;
 			pTimeTemp = p.time;
-			if(globalTime > time)
+			if(airport.globalTime > time)
 				timeTemp = time + 60*60*24;
-			if(globalTime > p.time)
+			if(airport.globalTime > p.time)
 				pTimeTemp = p.time + 60*60*24;
 			return timeTemp - pTimeTemp;
 		}
@@ -255,6 +267,10 @@ public class GUIMain extends Application{
 		if(hour < 10)
 			hourS = "0" + hour;
 		return hourS + ":" + minuteS + ":" + secondS;
+	}
+	
+	public void changeTime(int newTime) {
+		airport.globalTime = newTime;
 	}
 	
 	/**

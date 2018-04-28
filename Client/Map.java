@@ -1,4 +1,3 @@
-package Client;
 
 import java.awt.Point;
 import java.util.ArrayList;
@@ -28,6 +27,8 @@ public class Map {
 			for(int y =0; y < 100; y++)
 				map[x][y] = MapTile.GRASS;
 		}
+
+		addRectangle(35,50,30,50, MapTile.PAVEMENT);
 		
 		addRectangle(10,70,10,15, MapTile.RUNWAY);
 		addRectangle(85,90,20,90, MapTile.RUNWAY);
@@ -40,11 +41,11 @@ public class Map {
 		
 		addRectangle(83,83,23,26, MapTile.RUNWAYWAIT);
 		
-		addRectangle(65,68,16,30,MapTile.TAXIWAYSOUTH);
-		addRectangle(10,68,30,33, MapTile.TAXIWAYWEST);
-		addRectangle(10,13,16,29, MapTile.TAXIWAYNORTH);
-		map[66][30] = MapTile.TAXIWAYSOUTH; // to make sure the plane goes to the middle of the runway
-		map[11][30] = MapTile.TAXIWAYNORTH;
+		addRectangle(65,68,16,30,MapTile.TAXIWAY);
+		addRectangle(10,68,30,33, MapTile.TAXIWAY);
+		addRectangle(10,13,16,29, MapTile.TAXIWAY);
+		map[66][30] = MapTile.TAXIWAY; // to make sure the plane goes to the middle of the runway
+		map[11][30] = MapTile.TAXIWAY;
 		addRectangle(10,13,17,17, MapTile.RUNWAYWAIT);
 		addRectangle(10,13,11,11, MapTile.RUNWAYSTOP);
 		
@@ -72,10 +73,9 @@ public class Map {
 		addRectangle(48,50,36,36, MapTile.BUILDING);
 		addRectangle(48,50,41,41, MapTile.BUILDING);
 		addRectangle(48,50,46,46, MapTile.BUILDING);
-		
-		
-		
-		addRectangle(10,10,30,33, MapTile.STOP);
+		//RADIO TOWER
+		addRectangle(60,70,37,45, MapTile.BUILDING);
+
 		runway0Entry = new Point();
 		runway0Entry.setLocation(0,12);
 		runway1Entry = new Point();
@@ -213,21 +213,19 @@ public class Map {
 			for(int y =0; y < 100; y++) {
 				if(map[x][y] == MapTile.GRASS) 
 					gc.setFill(Color.GREEN);
-				else if(map[x][y] == MapTile.TAXIWAYEAST ||  
-						map[x][y] == MapTile.TAXIWAYNORTH || map[x][y] == MapTile.TAXIWAYSOUTH || map[x][y] == MapTile.TAXIWAY)
-					gc.setFill(Color.DARKGREY);
-				else if(map[x][y] == MapTile.TAXIWAYWEST)
+				else if( map[x][y] == MapTile.TAXIWAY)
 					gc.setFill(Color.GREY);
 				else if(map[x][y] == MapTile.BUILDING) 
-					gc.setFill(Color.DARKMAGENTA);
-				else if(map[x][y] == MapTile.TERMINAL1 || map[x][y] == MapTile.TERMINAL2 || map[x][y] == MapTile.TERMINAL3 )
-					gc.setFill(Color.CORAL);
+					gc.setFill(Color.DARKSLATEGREY);
+				else if(map[x][y] == MapTile.TERMINAL1 || map[x][y] == MapTile.TERMINAL2 || map[x][y] == MapTile.TERMINAL3  ||
+						map[x][y] == MapTile.TERMINAL4 || map[x][y] == MapTile.TERMINAL5 || map[x][y] == MapTile.TERMINAL6)
+					gc.setFill(Color.GREY);
 				else if(map[x][y] == MapTile.RUNWAYWAIT)
-					gc.setFill(Color.DARKCYAN);
-				else if (map[x][y] == MapTile.RUNWAYSTOP)
-					gc.setFill(Color.AQUA);
-				else if(map[x][y] == MapTile.INTERSECTION)
-					gc.setFill(Color.INDIANRED);
+					gc.setFill(Color.CORAL);
+				else if(map[x][y] == MapTile.INTERSECTIONA1)
+					gc.setFill(Color.GREY);
+				else if(map[x][y] == MapTile.PAVEMENT)
+					gc.setFill(Color.DARKGREY);
 				else 
 					gc.setFill(Color.BLACK);
 				gc.fillRect(x*drawScale,y*drawScale + topBar,drawScale,drawScale);
@@ -243,7 +241,7 @@ public class Map {
 	 */
 	public Queue<Instruction> termDirections(int terminal, int runway) {
 		if(runway == 0) {
-			return terminalDir0.get(terminal);
+			return terminalDir0.get(terminal); 
 		}
 		else return terminalDir1.get(terminal);
 	}

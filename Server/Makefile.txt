@@ -1,0 +1,7 @@
+.PHONY: clean
+
+default: *.java
+	javac -cp . *.java
+
+clean:
+	rm *.class

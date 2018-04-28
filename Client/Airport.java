@@ -1,11 +1,12 @@
-package Client;
 import java.awt.Point;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Queue;
+import java.util.Random;
 
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
 
 /**
  * Controls the management of the airport and a certain number of planes
@@ -15,6 +16,7 @@ public class Airport {
 	private final static int totalRunways = 1;
 	ArrayList<Plane> planesOnGround = new ArrayList<Plane>();
 	ClientServer clientServer;
+	private boolean isOnline;
 	
 	public static Map map = new Map();
 	private static int[] runwayUsage;
@@ -23,20 +25,45 @@ public class Airport {
 	public static boolean i2InUse = false;
 	public static boolean i1InUse = false;
 	public static int landedPlanes;
+	public int globalTime;//seconds
+	
+	private Random rand;
+	
+	private int localColorR;
+	private int localColorG;
+	private int localColorB;
 	
 	//terminalUsage
 	private boolean[] terminalUsage = new boolean[map.getTerminals()];
 	
 	private static int totalPlanes = 0;
 	
-	public Airport() {
+	public Airport(boolean isOnline, String serverAddr) {
+		this.isOnline = isOnline;
 		runwayUsage = new int[totalRunways];
 		for(int i = 0; i < totalRunways; i++)
 			runwayUsage[i] = -1;
 		for(int i = 0; i < map.getTerminals(); i++)
 			terminalUsage[i] = false;
 		landedPlanes = 0;
-		clientServer = new ClientServer(this);
+		if(isOnline)
+			clientServer = new ClientServer(this, serverAddr);
+		if(!isOnline)
+			globalTime = 0;
+		else {
+			try {
+				Thread.sleep(1000);
+				clientServer.reqTime();
+				clientServer.planeList();
+				clientServer.reqTerm();
+				clientServer.reqRunway();
+			} catch (InterruptedException e) {}
+		}
+		
+		rand = new Random();
+		localColorR = rand.nextInt(255);
+		localColorB = rand.nextInt(255);
+		localColorG = rand.nextInt(255);
 	}
 	
 	//A plane ask for a open runway
@@ -50,11 +77,15 @@ public class Airport {
 		if(runway0InUse == false) {
 			runway0InUse = true;
 			landedPlanes++;
+			if(isOnline)
+				clientServer.sendRunway(0, true);
 			return map.runway0Entry;
 		}
 		if(runway1InUse == false) {
 			runway1InUse = true;
 			landedPlanes++;
+			if(isOnline)
+				clientServer.sendRunway(1, true);
 			return map.runway1Entry;
 		}
 		return null;
@@ -65,6 +96,8 @@ public class Airport {
 	 * @param runway - the runway the plane was using
 	 */
 	public void leftRunway(int runway) {
+		if(isOnline)
+			clientServer.sendRunway(runway, false);
 		if(runway == 0)
 			runway0InUse = false;
 		else
@@ -75,13 +108,37 @@ public class Airport {
 	 * Creates a new plane that needs to takeoff off from a given runway
 	 * @param takeoffRunway - the runway the plane has request to leave from
 	 */
-	public void newPlane(int takeoffRunway) {
-		Plane plane = new Plane(this,map,totalPlanes,takeoffRunway);
+	public void newPlane(int takeoffRunway) { 
+		Plane plane = new Plane(this,map,totalPlanes,takeoffRunway, localColorR, localColorG, localColorB);
 		planesOnGround.add(plane);
+		System.out.println("plane added");
 		totalPlanes++;
-		try {
-			clientServer.newPlane(plane);
-		} catch (IOException e) {}
+		if(isOnline)
+			clientServer.newPlane(plane.getShell());
+		
+	}
+	
+	/**
+	 * Adds a plane that was sent from another client
+	 * If the plane was previously sent to it then it replaces the current plane in the list
+	 * @param plane - the plane to be added
+	 */
+	public void newClientPlane(PlaneShell plane) {
+		plane.foreign = true;
+		boolean planeRep = false;
+		synchronized(this) {
+			for(Plane gPlane : planesOnGround) {
+				System.out.println("Plane: " + plane.planeNum + " = " + gPlane.planeNum);
+				if(gPlane.planeNum == plane.planeNum) {
+					planesOnGround.remove(gPlane);
+					planeRep = true;
+					break;
+				}
+			}
+		}
+		planesOnGround.add(new Plane(this, plane, map));
+		if(!planeRep)
+			totalPlanes++;
 	}
 	
 	/**
@@ -91,15 +148,18 @@ public class Airport {
 	public void nextTick() {
 		if(planesOnGround.size() == 0)
 			return;
-		for(int i = 0; i < planesOnGround.size(); i++) {
-			if(planesOnGround.get(i).hasLeft()) {
-		//		terminalUsage[plane.getTerminal()] = false;
-				planesOnGround.remove(i);
-				landedPlanes--;
-				return;
+		synchronized(this) {
+			for(int i = 0; i < planesOnGround.size(); i++) {
+				if(planesOnGround.get(i).hasLeft()) {
+					System.out.println("plane removed");
+					planesOnGround.remove(i);
+					landedPlanes--;
+					return;
+				}
+				planesOnGround.get(i).nextTick();
 			}
-			planesOnGround.get(i).nextTick();
 		}
+		
 	}
 	
 	/**
@@ -120,9 +180,9 @@ public class Airport {
 	 * @param topBar - the height of the bar at the top of the sim
 	 */
 	private void drawPlanes(GraphicsContext gc, double drawScale, int topBar) {
-		gc.setFill(Color.AQUAMARINE);
 		for(Plane plane : planesOnGround) {
-			plane.nextTick();
+		//	plane.nextTick();
+			gc.setFill(Color.rgb(plane.rColor, plane.gColor, plane.bColor));
 			if(plane.isInAir())
 				return;
 			gc.fillOval(plane.getX() * drawScale, plane.getY() * drawScale + topBar, 10, 10);
@@ -154,7 +214,14 @@ public class Airport {
 	public Queue<Instruction> getTerminal(int runway) {
 		for(int i = 0; i < map.getTerminals(); i++) {
 			if(terminalUsage[i] == false) {
-				terminalUsage[i] = true;
+				if(isOnline)
+					clientServer.sendTerminal(i, true);
+			/*	try {
+					Thread.sleep(rand.nextInt(350) + 200);
+				} catch (InterruptedException e) {}
+				if(terminalUsage[i] == true)
+					return null;
+				*/terminalUsage[i] = true;
 				return map.termDirections(i, runway);
 			}
 		}
@@ -186,5 +253,48 @@ public class Airport {
 	 */
 	public void leftTerminal(int terminal) {System.out.println(terminal);
 		terminalUsage[terminal] = false;
+		clientServer.sendTerminal(terminal, false);
 	}
+	
+	/**
+	 * changes the status in terminalUsuage to status
+	 * Used for changes from the server
+	 * @param termNum - the terminal being used
+	 * @param status - status of the terminal change
+	 */
+	public void setTerminalStatus(int termNum, boolean status) {
+		terminalUsage[termNum] = status;
+	}
+	
+	/**
+	 * Changes the status of the runway
+	 * similar to setTerminalStatus
+	 * @param runway - runway that has the status changed
+	 * @param status - status of the runway
+	 */
+	public void setRunwayStatus(int runway, boolean status) {
+		if(runway == 0)
+			runway0InUse = status;
+		else
+			runway1InUse = status;
+	}
+
+	/**
+	 * Sends the shell of a plane that needs to be transmitted over to clientServer
+	 * @param plane - the plane that will be set
+	 */
+	public void sendUpdatedInstructions(Plane plane) {
+		clientServer.newPlane(plane.getShell());
+		
+	}
+	
+	/**
+	 * @return - returns if the airport is connected to the server
+	 */
+	public boolean isOnline() {return isOnline;}
+	
+	/**
+	 * @return - gets the list of statuses for the terminals
+	 */
+	public boolean[] getTerminals() {return terminalUsage;}
 }
